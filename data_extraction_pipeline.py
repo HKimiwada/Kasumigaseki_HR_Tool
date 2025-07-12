@@ -2,6 +2,7 @@
 # 一旦は職務経歴書だけをデータ抽出対象とする。（データが豊富だから）
 import os
 import json
+import uuid
 from data_extraction_utils import should_process, extract_text_from_pdf, clean_text, get_embedding  
 
 DATA_DIR = 'Test'
@@ -20,7 +21,7 @@ with open(OUT_JSONL, 'w', encoding='utf-8') as out_f:
 
         emb = get_embedding(text)
         record = {
-            "id": str(fname),
+            "id": str(uuid.uuid4()),
             "filename": fname,
             "text": text,
             "embedding": emb,

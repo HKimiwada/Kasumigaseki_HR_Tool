@@ -4,7 +4,7 @@ import os
 import json
 from data_extraction_utils import should_process, extract_text_from_pdf, clean_text, get_embedding  
 
-DATA_DIR = 'Data'
+DATA_DIR = 'Test'
 OUT_JSONL = 'Database/processed_job_description.jsonl'
 
 with open(OUT_JSONL, 'w', encoding='utf-8') as out_f:

@@ -20,7 +20,7 @@ with open(OUT_JSONL, 'w', encoding='utf-8') as out_f:
 
         emb = get_embedding(text)
         record = {
-            "id": str(fname),       # or use fname as ID
+            "id": str(fname),
             "filename": fname,
             "text": text,
             "embedding": emb,

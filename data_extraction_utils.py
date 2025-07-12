@@ -1,8 +1,18 @@
 # Utility functions for data extraction from Resumes
 import fitz # PyMuPDF
 
-doc = fitz.open("Data/谷口博城_職務経歴書.pdf")
-text = ""
-for page in doc:
-    text += page.get_text()
-print(text)
+def extract_text_from_pdf(pdf_path):
+    """
+    Extracts text from a PDF file.
+    
+    Args:
+        pdf_path (str): Path to the PDF file.
+        
+    Returns:
+        str: Extracted text from the PDF.
+    """
+    doc = fitz.open(pdf_path)
+    text = ""
+    for page in doc:
+        text += page.get_text()
+    return text

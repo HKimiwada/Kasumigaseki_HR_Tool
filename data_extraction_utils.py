@@ -1,5 +1,6 @@
 # Utility functions for data extraction from Resumes
 import fitz # PyMuPDF
+import re
 
 def extract_text_from_pdf(pdf_path):
     """
@@ -15,9 +16,27 @@ def extract_text_from_pdf(pdf_path):
         text += page.get_text()
     return text
 
+def clean_text(text):
+    """
+    Cleans the extracted text by removing unnecessary characters and formatting.
+    Args:
+        text (str): The raw text extracted from the PDF.
+    Returns:
+        str: Cleaned text.
+    """
+    # Remove multiple spaces and newlines
+    cleaned_text = re.sub(r'\s+', ' ', text)
+    # Remove leading and trailing spaces
+    cleaned_text = cleaned_text.strip()
+    return cleaned_text
+
 if __name__ == "__main__":
     # Example usage
-    variable_name = "○設計_小川佳英_ヒューマン【職務経歴書】"  
+    variable_name = "履歴書_能登屋　亮"  
     pdf_path = f"Data/{variable_name}.pdf"
     extracted_text = extract_text_from_pdf(pdf_path)
+    cleaned_text = clean_text(extracted_text)
     print(extracted_text)
+    print("=================================================")
+    print(cleaned_text)
+    print("=================================================")

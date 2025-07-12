@@ -32,7 +32,7 @@ def clean_text(text):
 
 if __name__ == "__main__":
     # Example usage
-    variable_name = "履歴書_能登屋　亮"  
+    variable_name = "鈴木智也_職務経歴書"  
     pdf_path = f"Data/{variable_name}.pdf"
     extracted_text = extract_text_from_pdf(pdf_path)
     cleaned_text = clean_text(extracted_text)

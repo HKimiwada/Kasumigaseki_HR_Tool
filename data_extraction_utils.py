@@ -1,6 +1,24 @@
 # Utility functions for data extraction from Resumes
+from dotenv import load_dotenv
+from openai import OpenAI
 import fitz # PyMuPDF
 import re
+import os
+
+# Load environment variables from .env
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+def get_embedding(text, model="text-embedding-3-small"):
+    text = text.replace("\n", " ")
+    response = client.embeddings.create(input=[text],model=model)
+    return response.data[0].embedding
+
+def should_process(filename: str) -> bool:
+    """Only process PDFs whose name includes 職務経歴書."""
+    return '職務経歴書' in filename
 
 def extract_text_from_pdf(pdf_path):
     """

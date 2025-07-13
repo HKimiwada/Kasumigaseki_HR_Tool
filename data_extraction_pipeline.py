@@ -4,21 +4,19 @@ import os
 import json
 import hashlib
 import logging
-from datetime import datetime
-from itertools import islice
+from datetime import datetime, timezone
 from data_extraction_utils import (
     should_process,
     extract_text_from_pdf,
     clean_text,
     get_embedding,
-    get_embeddings_batch,
 )
 
 # Configuration
-data_dir = 'Test'
-out_jsonl = 'Database/processed_job_description.jsonl'
-batch_size = 16
-os.makedirs(os.path.dirname(out_jsonl), exist_ok=True)
+DATA_DIR = 'Data'
+OUT_JSONL = 'Database/processed_job_description.jsonl'
+BATCH_SIZE = 16  # only for grouping file reads, embeddings are per-document
+os.makedirs(os.path.dirname(OUT_JSONL), exist_ok=True)
 
 # Setup logging
 logging.basicConfig(
@@ -32,15 +30,19 @@ logger = logging.getLogger(__name__)
 def compute_file_id(path: str) -> str:
     """Compute a SHA1 hash of file bytes for idempotency."""
     sha = hashlib.sha1()
-    with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(8192), b''):
-            sha.update(chunk)
+    try:
+        with open(path, 'rb') as f:
+            for chunk in iter(lambda: f.read(8192), b''):
+                sha.update(chunk)
+    except Exception as e:
+        logger.error(f"Cannot open file for hashing {path}: {e}")
+        raise
     return sha.hexdigest()
 
 # Load existing IDs to skip
 seen_ids = set()
-if os.path.exists(out_jsonl):
-    with open(out_jsonl, 'r', encoding='utf-8') as f:
+if os.path.exists(OUT_JSONL):
+    with open(OUT_JSONL, 'r', encoding='utf-8') as f:
         for line in f:
             try:
                 rec = json.loads(line)
@@ -48,68 +50,58 @@ if os.path.exists(out_jsonl):
             except json.JSONDecodeError:
                 continue
 
-# Generator for eligible files
-def pdf_files_generator():
-    for fname in os.listdir(data_dir):
-        if not fname.lower().endswith('.pdf'):
-            continue
-        if not should_process(fname):
-            continue
-        path = os.path.join(data_dir, fname)
-        yield fname, path
-
-# Batch iterator
-def batched(iterable, size):
-    it = iter(iterable)
-    while True:
-        batch = list(islice(it, size))
-        if not batch:
-            break
-        yield batch
-
-# Main pipeline
-new_records = []
-for batch in batched(pdf_files_generator(), batch_size):
-    texts = []
-    metas = []
-
-    # Extract & clean
-    for fname, path in batch:
-        try:
-            file_id = compute_file_id(path)
-            if file_id in seen_ids:
-                logger.debug(f"Skipping already processed: {fname}")
-                continue
-
-            raw = extract_text_from_pdf(path)
-            text = clean_text(raw)
-            texts.append(text)
-            metas.append({'id': file_id, 'filename': fname, 'text': text})
-        except Exception as e:
-            logger.error(f"Failed extraction for {fname}: {e}")
-
-    if not texts:
+# Find and process files
+for fname in os.listdir(DATA_DIR):
+    if not fname.lower().endswith('.pdf'):
+        continue
+    if not should_process(fname):
         continue
 
-    # Embed batch
+    path = os.path.join(DATA_DIR, fname)
     try:
-        embeddings = get_embeddings_batch(texts)
-    except Exception as e:
-        logger.error(f"Embedding batch failed: {e}")
-        # Fallback to individual
-        embeddings = [get_embedding(t) for t in texts]
+        file_id = compute_file_id(path)
+    except Exception:
+        # already logged
+        continue
+    if file_id in seen_ids:
+        logger.debug(f"Skipping already processed: {fname}")
+        continue
 
-    # Write to JSONL
-    with open(out_jsonl, 'a', encoding='utf-8') as out_f:
-        for meta, emb in zip(metas, embeddings):
-            record = {
-                'id': meta['id'],
-                'filename': meta['filename'],
-                'text': meta['text'],
-                'embedding': emb,
-                'ingested_at': datetime.now(datetime.UTC).isoformat(),
-            }
+    # Extract text
+    try:
+        raw = extract_text_from_pdf(path)
+    except Exception as e:
+        logger.error(f"PDF extraction failed for {fname}: {e}")
+        continue
+
+    # Clean and validate text
+    text = clean_text(raw)
+    if not text:
+        logger.warning(f"No textual content extracted from {fname}, skipping.")
+        continue
+
+    # Embed per document (handles chunking internally)
+    try:
+        emb = get_embedding(text)
+    except Exception as e:
+        logger.error(f"Embedding failed for {fname}: {e}")
+        continue
+
+    # Write record to JSONL
+    record = {
+        'id': file_id,
+        'filename': fname,
+        'text': text,
+        'embedding': emb,
+        'ingested_at': datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        with open(OUT_JSONL, 'a', encoding='utf-8') as out_f:
             out_f.write(json.dumps(record, ensure_ascii=False) + '\n')
-            logger.info(f"Processed and wrote: {meta['filename']}")
+    except Exception as e:
+        logger.error(f"Failed writing record for {fname}: {e}")
+        continue
+
+    logger.info(f"Processed and wrote: {fname}")
 
 logger.info("Pipeline completed.")

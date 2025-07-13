@@ -6,6 +6,7 @@ import re
 import os
 import hashlib
 import shelve
+import errno
 from tenacity import retry, wait_exponential, stop_after_attempt
 import tiktoken
 
@@ -16,7 +17,14 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Simple persistent cache for embeddings
-e_cache_path = os.path.join(os.path.dirname(__file__), 'emb_cache.db')
+cache_dir = os.path.join(os.getcwd(), 'Database')
+try:
+    os.makedirs(cache_dir, exist_ok=True)
+except OSError as e:
+    if e.errno != errno.EEXIST:
+        raise
+
+e_cache_path = os.path.join(cache_dir, 'emb_cache.db')
 cache = shelve.open(e_cache_path)
 
 def compute_id(text: str) -> str:

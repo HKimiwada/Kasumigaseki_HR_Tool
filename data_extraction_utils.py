@@ -115,7 +115,8 @@ def clean_text(text: str) -> str:
 
 if __name__ == '__main__':
     # Example usage
-    sample = 'Data/鈴木智也_職務経歴書.pdf'
+    sample = 'Data/水越牧朗_職務経歴書（1）.pdf'
+    sample = 'Data/水越牧郎_職務経歴書%20(1).pdf'
     raw = extract_text_from_pdf(sample)
     text = clean_text(raw)
     emb = get_embedding(text)

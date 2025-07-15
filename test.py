@@ -1,3 +1,4 @@
+# Memo: turn this into a FastAPI for larger deployments.
 import numpy as np
 import faiss, json
 from data_extraction_utils import get_embedding, clean_text, extract_text_from_pdf

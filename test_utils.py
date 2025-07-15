@@ -33,5 +33,7 @@ def visualize_embeddings(jsonl_path):
     plt.tight_layout()
     plt.show()
 
+# Highlight Input Embedding as Red, and FAISS Matched Embeddings as Blue, Other Embeddings as Grey
+
 if __name__ == "__main__":
     visualize_embeddings('Database/processed_job_description.jsonl')

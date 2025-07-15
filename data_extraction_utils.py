@@ -1,7 +1,10 @@
-# Utility functions for data extraction from Resumes
+# data_extraction_utils.py
+"""
+Utility functions for text extraction and embedding of Japanese resumes.
+"""
 from dotenv import load_dotenv
 from openai import OpenAI
-import fitz  # PyMuPDF
+import fitz      # PyMuPDF
 import re
 import os
 import hashlib
@@ -10,115 +13,120 @@ import errno
 from tenacity import retry, wait_exponential, stop_after_attempt
 import tiktoken
 
-# Load environment variables from .env
+# Load environment variables
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Simple persistent cache for embeddings
+# Persistent cache directory
 cache_dir = os.path.join(os.getcwd(), 'Database')
-try:
-    os.makedirs(cache_dir, exist_ok=True)
-except OSError as e:
-    if e.errno != errno.EEXIST:
-        raise
+os.makedirs(cache_dir, exist_ok=True)
+cache_path = os.path.join(cache_dir, 'emb_cache.db')
+cache = shelve.open(cache_path)
 
-e_cache_path = os.path.join(cache_dir, 'emb_cache.db')
-cache = shelve.open(e_cache_path)
+# Static in-memory tokenizer to avoid SQLite/thread issues
+tok = tiktoken.get_encoding('cl100k_base')
+
+# Embedding model name
+EMBED_MODEL = 'text-embedding-ada-002'
+
 
 def compute_id(text: str) -> str:
     """
-    Compute a stable SHA-1 hash of the text for caching.
+    Compute a stable SHA-1 hash for caching.
     """
     return hashlib.sha1(text.encode('utf-8')).hexdigest()
 
 def chunk_text(text: str, max_tokens: int = 2048) -> list[str]:
     """
-    Split a long text into chunks of at most `max_tokens` tokens
-    according to the model's tokenizer.
+    Split a long text into chunks of at most max_tokens tokens.
+    Uses a static in-memory tokenizer to avoid SQLite.
     """
-    enc = tiktoken.encoding_for_model('text-embedding-3-small')
-    tokens = enc.encode(text)
-    return [
-        enc.decode(tokens[i : i + max_tokens])
-        for i in range(0, len(tokens), max_tokens)
-    ]
+    tokens = tok.encode(text)
+    return [ tok.decode(tokens[i:i+max_tokens])
+             for i in range(0, len(tokens), max_tokens) ]
 
 @retry(wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(5))
-def _embed(texts: list[str], model: str = 'text-embedding-3-small') -> list[list[float]]:
+def _embed_batch(chunks: list[str], model: str) -> list[list[float]]:
     """
-    Internal embedder with retry, batching via OpenAI API.
+    Internal batched embedder with retry/backoff.
+    Filters out any empty chunks before calling the API.
     """
-    cleaned = [t.replace("\n", " ") for t in texts]
-    resp = client.embeddings.create(input=cleaned, model=model)
+    # Clean and filter
+    cleaned = [c.replace("\n"," ").strip() for c in chunks]
+    cleaned = [c for c in cleaned if c]
+    if not cleaned:
+        raise ValueError("No valid text for embedding after filtering.")
+    # Call embeddings API
+    resp = client.embeddings.create(model=model, input=cleaned)
     return [item.embedding for item in resp.data]
 
-def get_embedding(text: str, model: str = 'text-embedding-3-small') -> list[float]:
-    """
-    Get or compute the embedding for a single text, with chunking and caching.
-    """
-    text = text.replace("\n", " ")
-    tid = compute_id(text)
-    if tid in cache:
-        return cache[tid]
 
-    # Handle long documents by chunking
+def get_embedding(text: str, model: str = EMBED_MODEL) -> list[float]:
+    """
+    Compute or retrieve from cache a single embedding for the given text.
+    - Uses SHA-1 id for cache key
+    - Chunks text if too long
+    - Batch-embeds and average-pools
+    """
+    # Preprocess
+    text = text.replace("\n"," ").strip()
+    key = compute_id(text)
+    if key in cache:
+        return cache[key]
+
+    # Chunk for long input
     chunks = chunk_text(text)
-    embs = _embed(chunks, model)
-    # Average pooling over chunk embeddings
-    avg_emb = [sum(dim) / len(embs) for dim in zip(*embs)]
+    embs = _embed_batch(chunks, model)
+    # Average pooling
+    avg = [ sum(dims)/len(embs) for dims in zip(*embs) ]
 
     # Cache and return
-    cache[tid] = avg_emb
+    cache[key] = avg
     cache.sync()
-    return avg_emb
+    return avg
 
 
-def get_embeddings_batch(texts: list[str], model: str = 'text-embedding-3-small') -> list[list[float]]:
+def get_embeddings_batch(texts: list[str], model: str = EMBED_MODEL) -> list[list[float]]:
     """
-    Embed multiple texts in one batch call. Assumes each text <= token limit.
+    Embed a list of short texts in one batch call.
     """
-    return _embed(texts, model)
+    # Filter empty
+    inputs = [t.replace("\n"," ").strip() for t in texts]
+    inputs = [t for t in inputs if t]
+    if not inputs:
+        return []
+    return _embed_batch(inputs, model)
 
 
 def should_process(filename: str) -> bool:
     """
-    Only process PDFs whose name includes 職務経歴書.
+    Only process files with 職務経歴書 in the name.
     """
     return '職務経歴書' in filename
 
 
-def extract_text_from_pdf(pdf_path: str) -> str:
+def extract_text_from_pdf(path: str) -> str:
     """
-    Extracts text from a PDF file using PyMuPDF.
-    Args:
-        pdf_path (str): Path to the PDF file.
-    Returns:
-        str: Concatenated text from all pages.
+    Extract all text from a PDF file on disk.
     """
-    doc = fitz.open(pdf_path)
-    text = ''.join(page.get_text() for page in doc)
-    return text
+    doc = fitz.open(path)
+    return ''.join(page.get_text() for page in doc)
 
 
 def clean_text(text: str) -> str:
     """
-    Cleans the extracted text by removing excessive whitespace.
-    Args:
-        text (str): Raw text extracted from PDF.
-    Returns:
-        str: Whitespace-normalized text.
+    Normalize whitespace in extracted text.
     """
-    cleaned = re.sub(r'\s+', ' ', text)
-    return cleaned.strip()
+    return re.sub(r'\s+', ' ', text).strip()
+
 
 if __name__ == '__main__':
-    # Example usage
-    sample = 'Data/水越牧朗_職務経歴書（1）.pdf'
-    sample = 'Data/職務経歴書（小林氏）.pdf'
+    # Quick test
+    sample = 'Data/_小沼様_職務経歴書.pdf'
     raw = extract_text_from_pdf(sample)
     text = clean_text(raw)
-    emb = get_embedding(text)
-    print('Cleaned Text:', text[:100], '...')
-    print('Embedding Length:', len(emb))
+    print('Extracted:', text[:200])
+    emb = get_embedding('Hello, world!')
+    print('Embedding len:', len(emb))

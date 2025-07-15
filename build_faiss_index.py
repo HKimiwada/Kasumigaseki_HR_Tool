@@ -1,6 +1,9 @@
 # Creates Database Index for FAISS
+import os
 import json, numpy as np, faiss
-from config import OUT_JSONL, FAISS_INDEX_PATH, ID_MAP_PATH
+from config import OUT_JSONL, FAISS_INDEX_PATH, ID_MAP_PATH, DB_DIR
+
+os.makedirs(DB_DIR, exist_ok=True)
 
 # 1. Load records
 ids, filenames, embs = [], [], []

@@ -13,8 +13,7 @@ from data_extraction_utils import (
 )
 
 # Configuration
-DATA_DIR = 'Data'
-OUT_JSONL = 'Database/processed_job_description.jsonl'
+from config import DATA_DIR, OUT_JSONL  
 BATCH_SIZE = 16  # only for grouping file reads, embeddings are per-document
 os.makedirs(os.path.dirname(OUT_JSONL), exist_ok=True)
 

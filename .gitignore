@@ -1,3 +1,5 @@
 Data
 Test
 .env
+.venv
+__pycache__

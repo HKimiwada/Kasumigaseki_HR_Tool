@@ -33,5 +33,5 @@ def visualize_embeddings(jsonl_path):
     plt.tight_layout()
     plt.show()
 
-# Example usage
-visualize_embeddings('Database/processed_job_description.jsonl')
+if __name__ == "__main__":
+    visualize_embeddings('Database/processed_job_description.jsonl')

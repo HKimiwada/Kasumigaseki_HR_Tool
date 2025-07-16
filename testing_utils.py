@@ -1,4 +1,4 @@
-# Code to test the individual components of the HR Analysis System
+# Utility Functions to test the individual components of the HR Analysis System
 import json
 import numpy as np
 import matplotlib.pyplot as plt

@@ -12,6 +12,7 @@ import fitz  # PyMuPDF for in-memory PDF
 # Import utility functions
 from data_extraction_utils import clean_text, get_embedding
 from config import FAISS_INDEX_PATH, ID_MAP_PATH
+from testing_utils import visualize_faiss_output
 
 # --- 1. Load FAISS index & ID map with caching and Windows Unicode hack ---
 def load_faiss_index(index_path: str) -> faiss.Index:
@@ -106,6 +107,14 @@ if uploaded_file is not None:
                 st.success(f"トップ{top_k}の類似履歴書:")
                 for i, r in enumerate(results, start=1):
                     st.write(f"{i}. **{r['filename']}** — スコア {r['score']:.3f}")
+                ##### Updated Section
+                st.markdown("Debug用:結果の可視化")
+                visualize_faiss_output(
+                    'Database/processed_job_description.jsonl',
+                    red_filename=uploaded_file.name,
+                    blue_filenames=[r['filename'] for r in results]
+                )
+                ##### End of updated section
             else:
                 st.info("類似する履歴書が見つかりませんでした。")
     except Exception as e:

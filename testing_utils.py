@@ -259,7 +259,9 @@ def check_text_diversity():
     print(f"Unique texts: {len(unique_texts)} out of {len(texts)}")
 
 if __name__ == "__main__":
-    # visualize_embeddings('Database/processed_job_description.jsonl')
+    """
+    visualize_embeddings('Database/processed_job_description.jsonl')
     visualize_faiss_output('Database/processed_job_description.jsonl',
                            red_filename='職務経歴書_室井友伸.pdf',
                            blue_filenames=['職務経歴書（SMBC野村）.pdf', '小林学様【職務経歴書書】.pdf', '履歴書・職務経歴書.pdf', '職務経歴書（小澤金臣）.pdf'])
+    """

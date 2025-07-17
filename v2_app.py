@@ -121,43 +121,15 @@ def find_similar_adaptive(text: str, top_k: int):
         results.sort(key=lambda x: x["raw_score"])  # Lower distance is better
     
     # Check for suspiciously similar scores
+    """
     if len(results) >= 3:
         top_scores = [r["raw_score"] for r in results[:3]]
         score_std = np.std(top_scores)
         if score_std < 0.01:
             st.warning(f"⚠️ Top results have very similar scores (std: {score_std:.4f}). This suggests generic matching.")
+    """
     
     return results[:top_k]
-
-def find_similar_with_diversity(text: str, top_k: int, diversity_threshold: float = 0.9):
-    """
-    Find similar resumes but filter out near-duplicates for diversity
-    """
-    # Get more candidates than needed
-    candidates = find_similar_adaptive(text, top_k * 3)
-    
-    if not candidates:
-        return []
-    
-    # Keep the top result
-    selected = [candidates[0]]
-    
-    # Add diverse results
-    for candidate in candidates[1:]:
-        # Simple diversity check based on filename similarity
-        is_diverse = True
-        for selected_item in selected:
-            # Basic filename-based diversity (you could make this more sophisticated)
-            if candidate["filename"] == selected_item["filename"]:
-                is_diverse = False
-                break
-        
-        if is_diverse:
-            selected.append(candidate)
-            if len(selected) >= top_k:
-                break
-    
-    return selected
 
 # ————————————————
 # 3) Streamlit UI
@@ -165,13 +137,6 @@ def find_similar_with_diversity(text: str, top_k: int, diversity_threshold: floa
 st.set_page_config(page_title="Resume Similarity Search", layout="centered")
 st.title("📄 Resume Similarity Search (日本語対応)")
 st.markdown("日本語の職務経歴書PDFをアップロードして、類似履歴書を検索します。")
-
-# Add search method selection
-search_method = st.selectbox(
-    "検索方法を選択:",
-    ["Standard Search", "Diversity Search"],
-    help="Diversity Search filters out very similar results"
-)
 
 uploaded = st.file_uploader("職務経歴書PDFを選択", type=["pdf"])
 top_k = st.slider("表示する類似履歴書の数", 1, 20, 5)
@@ -189,10 +154,7 @@ if uploaded:
 
             with st.spinner("埋め込みと検索中…"):
                 # FIXED: Use the improved search functions
-                if search_method == "Diversity Search":
-                    results = find_similar_with_diversity(text, top_k)
-                else:
-                    results = find_similar_adaptive(text, top_k)
+                results = find_similar_adaptive(text, top_k)
 
             if results:
                 st.success(f"トップ {top_k} の類似履歴書:")

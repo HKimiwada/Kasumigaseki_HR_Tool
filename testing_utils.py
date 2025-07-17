@@ -90,6 +90,65 @@ def visualize_faiss_output(jsonl_path, red_filename, blue_filenames):
     plt.tight_layout()
     plt.show()
 
+# Returns Matplotlib Figure Object instead of showing it directly for displaying in Streamlit.
+def visualize_faiss_output_st(
+    jsonl_path: str,
+    red_filename: str,
+    blue_filenames: list[str]
+) -> plt.Figure:
+    """
+    Load embeddings, perform PCA, and return a Matplotlib Figure
+    with one red point, many blue points, and grey background points.
+    """
+    # 1. Load embeddings & filenames
+    embeddings = []
+    filenames  = []
+    with open(jsonl_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            rec = json.loads(line)
+            embeddings.append(rec['embedding'])
+            filenames.append(rec['filename'])
+
+    X = np.array(embeddings, dtype=np.float32)
+
+    # 2. PCA to 2D
+    pca   = PCA(n_components=2)
+    X_pca = pca.fit_transform(X)
+
+    # 3. Map filenames → indices
+    idx_red  = filenames.index(red_filename)
+    idx_blue = [filenames.index(fn) for fn in blue_filenames if fn in filenames]
+
+    # 4. Create figure & axes
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # 5. Draw background grey points
+    ax.scatter(
+        X_pca[:, 0], X_pca[:, 1],
+        color='lightgrey', alpha=0.7,
+    )
+
+    # 6. Overlay blue points
+    ax.scatter(
+        X_pca[idx_blue, 0], X_pca[idx_blue, 1],
+        color='blue', s=80, label='Similar Resumes'
+    )
+
+    # 7. Overlay red point
+    ax.scatter(
+        X_pca[idx_red, 0], X_pca[idx_red, 1],
+        color='red', s=100, label='Uploaded Resume'
+    )
+
+    # 8. Labels & legend
+    ax.set_title('PCA of Resume Embeddings')
+    ax.set_xlabel('PC1')
+    ax.set_ylabel('PC2')
+    ax.legend()
+    fig.tight_layout()
+
+    return fig
+
 if __name__ == "__main__":
     # visualize_embeddings('Database/processed_job_description.jsonl')
     visualize_faiss_output('Database/processed_job_description.jsonl',

@@ -217,6 +217,47 @@ def visualize_faiss_output_tsne(
     plt.tight_layout()
     return fig
 
+# Code to Diagnose Embeddings
+def diagnose_embeddings():
+    # Load all embeddings
+    embeddings = []
+    filenames = []
+    with open('Database/processed_job_description.jsonl', 'r', encoding='utf-8') as f:
+        for line in f:
+            rec = json.loads(line)
+            embeddings.append(rec['embedding'])
+            filenames.append(rec['filename'])
+    
+    X = np.array(embeddings)
+    
+    # Check embedding statistics
+    print(f"Embedding matrix shape: {X.shape}")
+    print(f"Mean embedding norm: {np.linalg.norm(X, axis=1).mean():.4f}")
+    print(f"Std embedding norm: {np.linalg.norm(X, axis=1).std():.4f}")
+    
+    # Check pairwise distances
+    from sklearn.metrics.pairwise import cosine_similarity
+    sim_matrix = cosine_similarity(X)
+    print(f"Mean cosine similarity: {sim_matrix.mean():.4f}")
+    print(f"Min cosine similarity: {sim_matrix.min():.4f}")
+    print(f"Max cosine similarity: {sim_matrix.max():.4f}")
+
+# Check what text is actually being embedded
+def check_text_diversity():
+    texts = []
+    with open('Database/processed_job_description.jsonl', 'r', encoding='utf-8') as f:
+        for line in f:
+            rec = json.loads(line)
+            texts.append(rec['text'])
+    
+    # Check text lengths and uniqueness
+    lengths = [len(t.split()) for t in texts]
+    print(f"Text lengths - mean: {np.mean(lengths):.1f}, std: {np.std(lengths):.1f}")
+    
+    # Check for duplicate or very similar texts
+    unique_texts = set(texts)
+    print(f"Unique texts: {len(unique_texts)} out of {len(texts)}")
+
 if __name__ == "__main__":
     # visualize_embeddings('Database/processed_job_description.jsonl')
     visualize_faiss_output('Database/processed_job_description.jsonl',

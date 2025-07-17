@@ -3,6 +3,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 
 def visualize_embeddings(jsonl_path):
     """
@@ -147,6 +148,73 @@ def visualize_faiss_output_st(
     ax.legend()
     fig.tight_layout()
 
+    return fig
+
+def visualize_faiss_output_tsne(
+    jsonl_path: str,
+    red_filename: str,
+    blue_filenames: list[str],
+    perplexity: int = 30,
+    random_state: int = 42
+) -> plt.Figure:
+    """
+    Load embeddings from a JSONL file, run t-SNE to reduce to 2D,
+    and plot a scatter:
+      - all points in light gray
+      - FAISS-suggested neighbors in blue
+      - the query (uploaded) resume in red
+
+    Returns a Matplotlib Figure.
+    """
+    # 1) Load embeddings & filenames
+    embeddings = []
+    filenames = []
+    with open(jsonl_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            rec = json.loads(line)
+            filenames.append(rec['filename'])
+            embeddings.append(rec['embedding'])
+    X = np.array(embeddings, dtype=np.float32)
+
+    # 2) Compute 2D via t-SNE
+    tsne = TSNE(
+        n_components=2,
+        perplexity=perplexity,
+        learning_rate='auto',
+        init='random',
+        random_state=random_state,
+        n_jobs=-1
+    )
+    X2 = tsne.fit_transform(X)  # shape (N, 2)
+
+    # 3) Identify indices for highlights
+    idx_map = {fn: i for i, fn in enumerate(filenames)}
+    red_idx = idx_map.get(red_filename, None)
+    blue_idxs = [idx_map[bf] for bf in blue_filenames if bf in idx_map]
+
+    # 4) Plot
+    fig, ax = plt.subplots(figsize=(8, 6))
+    # all points
+    ax.scatter(X2[:, 0], X2[:, 1],
+               color='lightgray', alpha=0.5, s=20, label='Database')
+    # neighbors
+    handled = False
+    for i in blue_idxs:
+        ax.scatter(X2[i, 0], X2[i, 1],
+                   color='blue', edgecolor='k', s=80,
+                   label='FAISS neighbor' if not handled else "")
+        handled = True
+    # query
+    if red_idx is not None:
+        ax.scatter(X2[red_idx, 0], X2[red_idx, 1],
+                   color='red', marker='X', s=150,
+                   label='Query resume')
+    # Legend and labels
+    ax.legend()
+    ax.set_title("t-SNE of Resume Embeddings\n(red=query, blue=FAISS neighbors)")
+    ax.set_xlabel("Dimension 1")
+    ax.set_ylabel("Dimension 2")
+    plt.tight_layout()
     return fig
 
 if __name__ == "__main__":

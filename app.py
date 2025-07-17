@@ -13,7 +13,7 @@ from openai import OpenAI
 # Configuration
 # ————————————————
 from config import FAISS_INDEX_PATH, ID_MAP_PATH
-from testing_utils import visualize_faiss_output_st
+from testing_utils import visualize_faiss_output_tsne
 
 # Load OpenAI client
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -103,7 +103,7 @@ if uploaded:
                     st.write(f"{i}. **{r['filename']}** — スコア {r['score']:.3f}")
                 ##### Updated Section
                 st.markdown("### Debug用:結果の可視化")
-                fig = visualize_faiss_output_st(
+                fig = visualize_faiss_output_tsne(
                     'Database/processed_job_description.jsonl',
                     red_filename=uploaded.name,
                     blue_filenames=[r['filename'] for r in results]
